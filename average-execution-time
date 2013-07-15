@@ -1,0 +1,1 @@
+grep execution log | tail -n +20 | awk '{ sum+=$16; count+=1 } END { print "Count =",count; print "Average =",sum/count}'
