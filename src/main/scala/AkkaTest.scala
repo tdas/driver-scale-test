@@ -81,8 +81,8 @@ object AkkaTest {
         println("Worker actor tested")
       }
 
-      case creationTime: Long => {
-        //println("Received ping from driver " + sender)
+      case (creationTime: Long, array: Array[Byte]) => {
+        //println("Received ping from driver " + sender + " along with an array of " + array.size + " bytes ")
         driverActor ! (creationTime, System.currentTimeMillis())
       }
 
@@ -119,7 +119,7 @@ object AkkaTest {
     Thread.sleep(1000)
   }
 
-  def test(numMessages: Int, numIterations: Int) {
+  def test(numMessages: Int, numIterations: Int, messageSize: Int) {
     println("TESTING")
     val numWorkers = workerActors.size
 
@@ -132,12 +132,13 @@ object AkkaTest {
       println("Pinging " + workerActors.size + " workers")
 
       val startTime = System.currentTimeMillis()
+      val array = new Array[Byte](messageSize)
+
       workerActors.zip(numMessagesPerWorker).foreach {
         case (workerActor, numMessagesToSend) => {
-          (1 to numMessagesToSend).foreach( i => workerActor ! System.currentTimeMillis() )
+          (1 to numMessagesToSend).foreach( i => workerActor ! (System.currentTimeMillis(),array) )
           //println("Sent " + numMessagesToSend + " messages sent to " + workerActor)
         }
-
       }
 
       println("Waiting for " + workerActors.size + " metrics to return")
@@ -163,22 +164,28 @@ object AkkaTest {
   def doFullTest(args: Array[String]) {
     println(System.getProperty("hello"))
     if (args.size < 5) {
-      println(this.getClass.getSimpleName + " <Spark home dir>  <Spark driver URL>  <# workers>  <# messages / iteration>  <# iterations>")
+      println(this.getClass.getSimpleName + " <Spark home dir>  <Spark driver URL>  <# workers>  <# iterations> <# messages / iteration> [# bytes / message]")
       System.exit(1)
     }
 
     val sparkHome = args(0)
     val sparkDriverURL = args(1)
     val numWorkers = args(2).toInt
-    val numMessages = args(3).toInt
-    val numIterations = args(4).toInt
+    val numIterations = args(3).toInt
+    val numMessages = args(4).toInt
+    val messageSize = if (args.size > 5) args(5).toInt else 1
 
     val sc = new SparkContext(sparkDriverURL, "AkkaTest", sparkHome,
       List("target/scala-2.9.3/driver-scale-test_2.9.3-1.0.jar"))
 
     setup(sc, numWorkers)
     //warmup(100)
-    test(numMessages, numIterations)
+    test(numMessages, numIterations, messageSize)
+
+    println("# workers = " + numWorkers)
+    println("# iterations = " + numIterations)
+    println("# messages / iteration = " + numMessages)
+    println("# bytes per message = " + messageSize)
   }
 
 
@@ -206,7 +213,7 @@ object AkkaTest {
     println("Messaged worker actor through sender ref " + workerActors.head.path)
     Thread.sleep(1000)
 
-    test(10, 10)
+    test(10, 10, 1)
 
     Thread.sleep(5000)
     println("Shutting down")
