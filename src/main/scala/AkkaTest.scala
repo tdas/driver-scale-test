@@ -119,16 +119,6 @@ object AkkaTest {
     Thread.sleep(1000)
   }
 
-  def warmup(numIterations: Int) {
-    println("WARMING UP")
-    for (i <- 1 to numIterations) {
-      allMetrics.clear()
-      workerActors.foreach(_ ! Ping())
-      while(allMetrics.size < workerActors.size) Thread.sleep(10)
-    }
-    println("Done " + numIterations)
-  }
-
   def test(numMessages: Int, numIterations: Int) {
     println("TESTING")
     val numWorkers = workerActors.size
@@ -141,26 +131,31 @@ object AkkaTest {
       allMetrics.clear()
       println("Pinging " + workerActors.size + " workers")
 
+      val startTime = System.currentTimeMillis()
       workerActors.zip(numMessagesPerWorker).foreach {
         case (workerActor, numMessagesToSend) => {
           (1 to numMessagesToSend).foreach( i => workerActor ! System.currentTimeMillis() )
-          println("Sent " + numMessagesToSend + " messages sent to " + workerActor)
+          //println("Sent " + numMessagesToSend + " messages sent to " + workerActor)
         }
 
       }
 
       println("Waiting for " + workerActors.size + " metrics to return")
       while(allMetrics.size < numMessages) {
-        Thread.sleep(200)
+        Thread.sleep(10)
         println("Got " + allMetrics.size + " metrics")
       }
+      val stopTime = System.currentTimeMillis()
+
       println(("-" * 20) + " Iteration " + i + ("-" * 20))
-      println("Total time")
+      println("Total round-trip times")
       Distribution(allMetrics.map(_.totalTime.toDouble)).foreach(_.summary())
-      println("Sending time")
+      println("Sending times")
       Distribution(allMetrics.map(_.sendingTime.toDouble)).foreach(_.summary())
-      println("Receiving time")
+      println("Receiving times")
       Distribution(allMetrics.map(_.receivingTime.toDouble)).foreach(_.summary())
+      println("Total iteration time")
+      Distribution(Seq(stopTime - startTime).map(_.toDouble)).foreach(_.summary())
     }
     println("Done " + numIterations)
   }
