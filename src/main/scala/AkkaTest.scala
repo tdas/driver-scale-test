@@ -23,14 +23,12 @@ object AkkaTest {
 
   case class Test()
 
-  case class Terminate()
-
   case class Metrics(totalTime: Long, sendingTime: Long, receivingTime: Long)
   {
     def this(ping: Ping) = this(
       ping.masterReceiveTime - ping.creationTime,
       ping.workerReceiveTime - ping.creationTime,
-      ping.workerReceiveTime - ping.masterReceiveTime
+      ping.masterReceiveTime - ping.workerReceiveTime
     )
   }
 
@@ -50,13 +48,17 @@ object AkkaTest {
         //context.actorFor("akka://spark@%s:%s/user/%s".format(workerHostname, workerPort, workerName))
         workerActors += workerActor
         //sender ! true
-        println("Registered " + sender.path + "(" + sender.path.address + ")")
+        println("Registered " + sender.path)
       }
 
-      case ping: Ping => {
-        ping.masterReceiveTime = System.currentTimeMillis()
-        println("Received ping " + ping + " back from worker " + sender)
-        val metrics = new Metrics(ping)
+      case (creationTime: Long, workerReceiveTime: Long) => {
+        val masterReceiveTime = System.currentTimeMillis()
+        println("Received ping back from worker " + sender)
+        val metrics = new Metrics(
+          masterReceiveTime - creationTime,
+          workerReceiveTime - creationTime,
+          masterReceiveTime - workerReceiveTime
+        )
         println("metrics = " + metrics)
         allMetrics += metrics
       }
@@ -79,10 +81,9 @@ object AkkaTest {
         println("Worker actor tested")
       }
 
-      case ping: Ping => {
-        println("Received " + ping + " ping from driver " + sender)
-        ping.workerReceiveTime = System.currentTimeMillis()
-        driverActor ! ping
+      case creationTime: Long => {
+        println("Received ping from driver " + sender)
+        driverActor ! (creationTime, System.currentTimeMillis())
       }
 
       case z: Any => {
@@ -128,13 +129,26 @@ object AkkaTest {
     println("Done " + numIterations)
   }
 
-  def test(numIterations: Int) {
+  def test(numMessages: Int, numIterations: Int) {
     println("TESTING")
+    val numWorkers = workerActors.size
+
+    val numMessagesPerWorker =
+      (1 to numMessages).grouped( math.ceil(numMessages / numWorkers.toDouble).toInt ).map(_.size).toSeq
+
     for (i <- 1 to numIterations) {
       println("Starting iteration " + i)
       allMetrics.clear()
       println("Pinging " + workerActors.size + " workers")
-      workerActors.foreach(_ ! Ping())
+
+      workerActors.zip(numMessagesPerWorker).foreach {
+        case (workerActor, numMessagesToSend) => {
+          (1 to numMessagesToSend).foreach( i => workerActor ! System.currentTimeMillis() )
+          println("Sent " + numMessagesToSend + " messages sent to " + workerActor)
+        }
+
+      }
+
       println("Waiting for " + workerActors.size + " pings to return")
       while(allMetrics.size < workerActors.size) {
         println("Got " + allMetrics.size + " pings")
@@ -153,22 +167,23 @@ object AkkaTest {
 
   def doFullTest(args: Array[String]) {
     println(System.getProperty("hello"))
-    if (args.size < 4) {
-      println(this.getClass.getSimpleName + " <Spark home dir>  <Spark driver URL>  <# workers>  <# iterations>")
+    if (args.size < 5) {
+      println(this.getClass.getSimpleName + " <Spark home dir>  <Spark driver URL>  <# workers>  <# messages / iteration>  <# iterations>")
       System.exit(1)
     }
 
     val sparkHome = args(0)
     val sparkDriverURL = args(1)
     val numWorkers = args(2).toInt
-    val numIterations = args(3).toInt
+    val numMessages = args(3).toInt
+    val numIterations = args(4).toInt
 
     val sc = new SparkContext(sparkDriverURL, "AkkaTest", sparkHome,
       List("target/scala-2.9.3/driver-scale-test_2.9.3-1.0.jar"))
 
     setup(sc, numWorkers)
     //warmup(100)
-    test(numIterations)
+    test(numMessages, numIterations)
   }
 
 
@@ -196,7 +211,7 @@ object AkkaTest {
     println("Messaged worker actor through sender ref " + workerActors.head.path)
     Thread.sleep(1000)
 
-    test(10)
+    test(10, 10)
 
     Thread.sleep(5000)
     println("Shutting down")
