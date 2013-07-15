@@ -53,13 +53,13 @@ object AkkaTest {
 
       case (creationTime: Long, workerReceiveTime: Long) => {
         val masterReceiveTime = System.currentTimeMillis()
-        println("Received ping back from worker " + sender)
+        //println("Received ping back from worker " + sender)
         val metrics = new Metrics(
           masterReceiveTime - creationTime,
           workerReceiveTime - creationTime,
           masterReceiveTime - workerReceiveTime
         )
-        println("metrics = " + metrics)
+        //println("metrics = " + metrics)
         allMetrics += metrics
       }
     }
@@ -82,7 +82,7 @@ object AkkaTest {
       }
 
       case creationTime: Long => {
-        println("Received ping from driver " + sender)
+        //println("Received ping from driver " + sender)
         driverActor ! (creationTime, System.currentTimeMillis())
       }
 
@@ -149,10 +149,10 @@ object AkkaTest {
 
       }
 
-      println("Waiting for " + workerActors.size + " pings to return")
-      while(allMetrics.size < workerActors.size) {
-        println("Got " + allMetrics.size + " pings")
-        Thread.sleep(1000)
+      println("Waiting for " + workerActors.size + " metrics to return")
+      while(allMetrics.size < numMessages) {
+        Thread.sleep(200)
+        println("Got " + allMetrics.size + " metrics")
       }
       println(("-" * 20) + " Iteration " + i + ("-" * 20))
       println("Total time")
