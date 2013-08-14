@@ -4,9 +4,9 @@ version := "1.0"
 
 scalaVersion := "2.9.3"
 
-libraryDependencies += "org.spark-project" % "spark-streaming_2.9.3" % "0.7.3"
+libraryDependencies += "org.spark-project" % "spark-streaming_2.9.3" % "0.8.0-SNAPSHOT"
 
-libraryDependencies += "org.spark-project" % "spark-core_2.9.3" % "0.7.3"
+libraryDependencies += "org.spark-project" % "spark-core_2.9.3" % "0.8.0-SNAPSHOT"
 
 resolvers ++= Seq(
     "Akka Repository" at "http://repo.akka.io/releases/",
