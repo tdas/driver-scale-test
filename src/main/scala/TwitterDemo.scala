@@ -20,15 +20,16 @@ object TwitterDemo {
     // Create the streams of tweets
     val tweets = ssc.twitterStream()
 
-    // Count the tags over a 1 minute window
-    val tagCounts = tweets.flatMap(status => getTags(status))
-                          .countByValueAndWindow(Minutes(1), Seconds(1))
+    // Get the statuses 
+    val statuses = tweets.map(status => status.getText())
+    /*statuses.print()*/
+
+    // Count the hashtags over a 1 minute window
+    val tagCounts = tweets.flatMap(status => getTags(status)).countByValueAndWindow(Minutes(1), Seconds(1))
+    /*tagCounts.print()*/
 
     // Sort the tags by counts
-    val sortedTags = tagCounts.map { case (tag, count) => (count, tag) }
-                              .transform(_.sortByKey(false))
-
-    // Print top 10 tags
+    val sortedTags = tagCounts.map { case (tag, count) => (count, tag) } .transform(_.sortByKey(false))
     sortedTags.foreach(showTopTags(20) _)
 
     ssc.start()
